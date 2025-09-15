@@ -188,10 +188,11 @@ impl BenchmarkRunner {
     /// Generate batch data for writing
     fn generate_batch_data(&mut self, start_index: usize, count: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let mut data = Vec::with_capacity(count);
-        
-        for i in 0..count {
+
+        let mut value_rng = StdRng::seed_from_u64(start_index as u64);
+        for _ in 0..count {
             let key = self.generate_key(self.config.key_size);
-            let value = self.generate_value(start_index + i, self.config.value_size);
+            let value = self.generate_value(&mut value_rng, self.config.value_size);
             data.push((key, value));
         }
         
@@ -210,10 +211,9 @@ impl BenchmarkRunner {
     }
     
     /// Generate value
-    fn generate_value(&mut self, index: usize, size: usize) -> Vec<u8> {
-        let value_str = format!("value_{:0width$}", index, width = size.saturating_sub(7));
-        let mut value = value_str.into_bytes();
-        value.resize(size, b'1');
+    fn generate_value(&mut self, rng: &mut StdRng, size: usize) -> Vec<u8> {
+        let mut value = vec![0u8; size];
+        rng.fill(&mut value[..]);
         value
     }
     
