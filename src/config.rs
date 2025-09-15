@@ -24,7 +24,7 @@ pub enum DatabaseBackend {
 #[command(author, version, about = "Database Benchmark Tool")]
 pub struct BenchConfig {
     /// Number of data entries per batch
-    #[arg(long, default_value = "50000")]
+    #[arg(long, default_value = "10000")]
     pub batch_size: usize,
     
     /// Size of key in bytes
@@ -58,12 +58,16 @@ pub struct BenchConfig {
     /// Random seed for reproducible tests
     #[arg(long, default_value = "42")]
     pub seed: u64,
+    
+    /// Number of parallel tables/column families to use
+    #[arg(long, default_value = "5")]
+    pub parallel_tables: usize,
 }
 
 impl Default for BenchConfig {
     fn default() -> Self {
         Self {
-            batch_size: 50000,
+            batch_size: 10000,
             key_size: 64,
             value_size: 200,
             target_batches: 100,
@@ -72,6 +76,7 @@ impl Default for BenchConfig {
             test_mode: TestMode::Write,
             backend: DatabaseBackend::RocksDB,
             seed: 42,
+            parallel_tables: 5,
         }
     }
 }
@@ -96,6 +101,7 @@ impl BenchConfig {
         println!("  Storage Path: {:?}", self.get_storage_path());
         println!("  Sort Keys: {}", self.sort_keys);
         println!("  Random Seed: {}", self.seed);
+        println!("  Parallel Tables: {}", self.parallel_tables);
         println!();
     }
 }

@@ -80,7 +80,7 @@ impl BenchmarkRunner {
             let current_entries = db.count_entries()?;
             let data = self.generate_batch_data(current_entries as usize, self.config.batch_size);
             
-            let duration = db.write_batch(data)?;
+            let duration = db.write_batch(data, self.config.parallel_tables)?;
             let new_entries = db.count_entries()?;
             
             let result = BatchResult {
@@ -93,17 +93,18 @@ impl BenchmarkRunner {
             batch_results.push(result.clone());
             
             println!(
-                "Write Batch {}: {:?}, DB entries: {}, per entry: {:?}",
+                "Write Batch {}: {:?}, DB entries: {}, per entry: {:?}, total writes: {}",
                 batch_idx,
                 duration,
                 new_entries,
-                duration / self.config.batch_size as u32
+                duration / self.config.batch_size as u32,
+                self.config.batch_size * self.config.parallel_tables
             );
         }
         
         let total_duration = start_time.elapsed();
         let total_entries = db.count_entries()?;
-        let operations_per_second = (self.config.target_batches * self.config.batch_size) as f64 / total_duration.as_secs_f64();
+        let operations_per_second = (self.config.target_batches * self.config.batch_size * self.config.parallel_tables) as f64 / total_duration.as_secs_f64();
         
         drop(db);
         
@@ -123,18 +124,6 @@ impl BenchmarkRunner {
     fn run_read_benchmark(&mut self, storage_path: &Path) -> Result<BenchmarkResult> {
         println!("Starting read benchmark with {:?} backend...", self.config.backend);
         
-        // Check if database exists and has data
-        {
-            let db = create_database(&self.config.backend, storage_path)?;
-            let db_size = db.count_entries()?;
-            drop(db);
-            
-            if db_size == 0 {
-                println!("Warning: Database is empty. Running write benchmark first...");
-                let _write_result = self.run_write_benchmark(storage_path)?;
-            }
-        }
-        
         // Reopen database for read test
         let mut db = create_database(&self.config.backend, storage_path)?;
         let mut batch_results = Vec::new();
@@ -142,9 +131,12 @@ impl BenchmarkRunner {
         
         for batch_idx in 0..self.config.target_batches {
             let keys = self.generate_read_keys(batch_idx);
-            let (duration, found_values) = db.read_batch(keys.clone())?;
+            let (duration, found_values) = db.read_batch(keys.clone(), self.config.parallel_tables)?;
             
-            let found_count = found_values.iter().filter(|v| v.is_some()).count();
+            let found_count = found_values.iter()
+                .flat_map(|key_results| key_results.iter())
+                .filter(|v| v.is_some())
+                .count();
             let total_entries = db.count_entries()?;
             
             let result = BatchResult {
@@ -155,21 +147,23 @@ impl BenchmarkRunner {
             };
             
             batch_results.push(result.clone());
+            let total_reads = keys.len() * self.config.parallel_tables;
             
             println!(
-                "Read Batch {}: {:?}, found {}/{} entries, DB entries: {}, per entry: {:?}",
+                "Read Batch {}: {:?}, found {}/{} entries, DB entries: {}, per entry: {:?}, total reads: {}",
                 batch_idx,
                 duration,
                 found_count,
-                keys.len(),
+                total_reads,
                 total_entries,
-                duration / keys.len() as u32
+                duration / total_reads as u32,
+                total_reads
             );
         }
         
         let total_duration = start_time.elapsed();
         let total_entries = db.count_entries()?;
-        let operations_per_second = (self.config.target_batches * self.config.batch_size) as f64 / total_duration.as_secs_f64();
+        let operations_per_second = (self.config.target_batches * self.config.batch_size * self.config.parallel_tables) as f64 / total_duration.as_secs_f64();
         
         drop(db);
         
