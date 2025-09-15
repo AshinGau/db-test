@@ -71,17 +71,29 @@ impl Database for RocksDBImpl {
     
     fn write_batch(&mut self, data: Vec<(Vec<u8>, Vec<u8>)>) -> Result<Duration> {
         use std::time::Instant;
+        use rocksdb::{WriteBatch, WriteOptions};
         
         let start = Instant::now();
-        let mut batch = rocksdb::WriteBatch::default();
+        let mut batch = WriteBatch::default();
         
+        // Build batch data
         for (key, value) in data {
             batch.put(&key, &value);
         }
         
+        // Set write options to ensure data is flushed to disk
+        let mut write_opts = WriteOptions::default();
+        write_opts.set_sync(true);  // Force sync to disk
+        
+        // Execute atomic batch write
         self.db
-            .write(batch)
+            .write_opt(batch, &write_opts)
             .map_err(|e| DbError::Database(format!("Failed to write batch: {}", e)))?;
+        
+        // Force flush to ensure data is persisted to disk
+        self.db
+            .flush()
+            .map_err(|e| DbError::Database(format!("Failed to flush to disk: {}", e)))?;
         
         Ok(start.elapsed())
     }
@@ -156,13 +168,20 @@ impl Database for SledImpl {
         let start = Instant::now();
         let mut batch = sled::Batch::default();
         
+        // Build batch data
         for (key, value) in data {
             batch.insert(&*key, &*value);
         }
         
+        // Execute atomic batch write
         self.db
             .apply_batch(batch)
             .map_err(|e| DbError::Database(format!("Failed to write batch: {}", e)))?;
+        
+        // Force flush to ensure data is persisted to disk
+        self.db
+            .flush()
+            .map_err(|e| DbError::Database(format!("Failed to flush to disk: {}", e)))?;
         
         Ok(start.elapsed())
     }
