@@ -42,8 +42,19 @@ cargo run --release -- \
 
 echo
 
+# 测试 MDBX 写入性能
+echo "3. 测试 MDBX 写入性能..."
+cargo run --release -- \
+    --backend mdbx \
+    --test-mode write \
+    --batch-size "$BATCH_SIZE" \
+    --target-batches "$TARGET_BATCHES" \
+    --storage-dir "$STORAGE_DIR/mdbx"
+
+echo
+
 # 测试 RocksDB 读取性能
-echo "3. 测试 RocksDB 读取性能..."
+echo "4. 测试 RocksDB 读取性能..."
 cargo run --release -- \
     --backend rocksdb \
     --test-mode read \
@@ -54,13 +65,24 @@ cargo run --release -- \
 echo
 
 # 测试 Sled 读取性能
-echo "4. 测试 Sled 读取性能..."
+echo "5. 测试 Sled 读取性能..."
 cargo run --release -- \
     --backend sled \
     --test-mode read \
     --batch-size "$BATCH_SIZE" \
     --target-batches "$TARGET_BATCHES" \
     --storage-dir "$STORAGE_DIR/sled"
+
+echo
+
+# 测试 MDBX 读取性能
+echo "6. 测试 MDBX 读取性能..."
+cargo run --release -- \
+    --backend mdbx \
+    --test-mode read \
+    --batch-size "$BATCH_SIZE" \
+    --target-batches "$TARGET_BATCHES" \
+    --storage-dir "$STORAGE_DIR/mdbx"
 
 echo
 echo "=== 测试完成 ==="

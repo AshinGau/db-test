@@ -17,6 +17,8 @@ pub enum DatabaseBackend {
     RocksDB,
     #[value(name = "sled")]
     Sled,
+    #[value(name = "mdbx")]
+    Mdbx,
 }
 
 /// Configuration parameters for database benchmarking
