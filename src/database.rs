@@ -131,24 +131,12 @@ impl Database for RocksDBImpl {
             .into_par_iter()
             .map(|table_idx| {
                 let cf_name = &self.column_family_names[table_idx];
-                let mut batch = WriteBatch::default();
-                
                 // Build batch for this specific column family
                 for (key, value) in &data {
                     if let Some(cf) = self.db.cf_handle(cf_name) {
-                        batch.put_cf(cf, key, value);
+                        self.db.put_cf(cf, key, value).map_err(|e| DbError::Database(format!("Failed to write batch to {}: {}", cf_name, e)))?;
                     }
-                }
-                
-                // Set write options to ensure data is flushed to disk
-                let mut write_opts = WriteOptions::default();
-                write_opts.set_sync(true);  // Force sync to disk
-                
-                // Execute atomic batch write for this column family
-                self.db
-                    .write_opt(batch, &write_opts)
-                    .map_err(|e| DbError::Database(format!("Failed to write batch to {}: {}", cf_name, e)))?;
-                
+                }                
                 Ok(())
             })
             .collect();
