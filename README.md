@@ -10,6 +10,7 @@ A comprehensive database benchmarking tool that supports multiple database backe
 - **Result Export**: JSON format result export for analysis
 - **Extensible Design**: Easy to add new database backends
 - **Concurrent Testing**: Support for parallel table operations
+- **Read-Write Concurrency**: Real-world concurrent read/write benchmark scenarios
 - **Memory-Mapped Files**: Optimized for large datasets with efficient memory usage
 
 ## Installation and Compilation
@@ -195,6 +196,66 @@ impl Database for MyDatabaseImpl {
 - Set appropriate random seed for reproducible results
 - For MDBX, the tool automatically configures optimal map_size to prevent sparse files
 
+## Read-Write Concurrent Benchmark
+
+**NEW**: A specialized concurrent benchmark tool for testing RocksDB's performance under simultaneous read and write workloads.
+
+### Quick Start
+
+```bash
+# Run small-scale concurrent test (quick validation)
+cargo run --example concurrent_benchmark_small
+
+# Run full-scale concurrent test
+cargo run --example concurrent_benchmark
+```
+
+### Key Features
+
+- **Concurrent Execution**: Write threads and read threads run simultaneously
+- **Progress Synchronization**: Writers notify readers via channels when batches complete
+- **Iterator-based Reads**: Uses RocksDB Iterator interface for scanning
+- **Direct Writes**: Uses `db.put()` for individual writes (not batch writes)
+- **Smart Caching**: Readers cache previous batch keys and loop when no new data available
+- **Deterministic Data**: Shared random seed ensures reproducible results
+
+### Configuration Example
+
+```rust
+use db_test::{ConcurrentBenchmarkRunner, ConcurrentBenchConfig};
+
+let config = ConcurrentBenchConfig {
+    seed: 42,
+    batch_size: 10000,
+    total_batches: 100,
+    key_size: 64,
+    value_size: 200,
+    write_threads: 2,
+    read_threads: 4,
+    storage_path: "/tmp/rocksdb_test".to_string(),
+};
+
+let runner = ConcurrentBenchmarkRunner::new(config);
+let result = runner.run()?;
+result.print_summary();
+```
+
+### Output Example
+
+```
+=== 读写并发测试结果 ===
+总运行时间: 161.336ms
+总写入操作数: 10000
+总读取操作数: 47000
+写入吞吐量: 61982.35 ops/sec
+读取吞吐量: 291317.05 ops/sec
+平均写批次时间: 24.871ms
+平均读批次时间: 7.111ms
+========================
+```
+
+📖 For detailed documentation, see [CONCURRENT_BENCHMARK.md](CONCURRENT_BENCHMARK.md)
+
 ## Benchmark Comparison
 
 Use the provided comparison script to test all backends:
@@ -225,14 +286,20 @@ This script will:
 ```
 db-test/
 ├── src/
-│   ├── main.rs           # Entry point
-│   ├── config.rs         # Configuration and CLI
-│   ├── database.rs       # Database trait and implementations
-│   └── benchmark.rs      # Benchmark execution logic
+│   ├── main.rs                    # Entry point
+│   ├── lib.rs                     # Library exports
+│   ├── config.rs                  # Configuration and CLI
+│   ├── database.rs                # Database trait and implementations
+│   ├── benchmark.rs               # Sequential benchmark logic
+│   ├── concurrent_benchmark.rs    # Concurrent read/write benchmark
+│   └── error.rs                   # Error types
 ├── examples/
-│   └── benchmark_comparison.sh  # Comparison script
-├── Cargo.toml            # Dependencies
-└── README.md             # This file
+│   ├── benchmark_comparison.sh           # Comparison script
+│   ├── concurrent_benchmark.rs           # Full concurrent test
+│   └── concurrent_benchmark_small.rs     # Quick validation test
+├── Cargo.toml                     # Dependencies
+├── README.md                      # This file
+└── CONCURRENT_BENCHMARK.md        # Concurrent benchmark documentation
 ```
 
 ## Dependencies
